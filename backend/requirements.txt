@@ -3,3 +3,8 @@ flask-cors
 python-dotenv
 transformers
 torch
+sentence-transformers
+scikit-learn
+numpy
+pypdf
+docx2txt

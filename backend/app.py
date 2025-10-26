@@ -2,6 +2,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
+from typing import List
 
 # Local model support (transformers only)
 # Default to a very fast, instruction-tuned seq2seq model for quick paragraph answers
@@ -51,6 +52,17 @@ except Exception:
 
 app.logger.info(f"Local model: {LOCAL_MODEL_NAME} (enabled={USE_LOCAL_MODEL})")
 
+# --- RAG (enterprise knowledge base) ---
+try:
+    from rag_store import get_store, rebuild_from_folder, save_uploaded_files
+    _rag_available = True
+    # Preload (or create empty) index on startup
+    _ = get_store()
+    app.logger.info("RAG index ready (loaded or initialized)")
+except Exception as e:  # pragma: no cover
+    _rag_available = False
+    app.logger.warning(f"RAG disabled: {e}")
+
 
 @app.route("/", methods=["GET"])
 def home():
@@ -60,6 +72,18 @@ def home():
 def chat():
     data = request.get_json()
     user_message = data.get("message", "")
+    use_kb = bool(data.get("use_kb", True))
+
+    # Retrieve enterprise context when available
+    context_blocks: List[str] = []
+    if _rag_available and use_kb:
+        try:
+            store = get_store()
+            chunks = store.retrieve(user_message, top_k=5)
+            for ch in chunks:
+                context_blocks.append(f"[Source: {ch.source}]\n{ch.text}")
+        except Exception:
+            app.logger.exception("RAG retrieval failed")
     # Local-only generation
     reply = None
     if USE_LOCAL_MODEL:
@@ -68,12 +92,21 @@ def chat():
             if gen:
                 text = str(user_message).strip()
                 if "t5" in LOCAL_MODEL_NAME.lower():
-                    # Simple, concise answers without repetition
-                    prompt = f"Answer this question briefly and clearly in 2-3 sentences:\n\nQuestion: {text}\n\nAnswer:"
+                    # Simple, concise answers grounded in context (if present)
+                    if context_blocks:
+                        ctx = "\n\n---\n".join(context_blocks)
+                        prompt = (
+                            "You are an enterprise assistant. Answer ONLY using the information from the context. "
+                            "If the answer is not contained in the context, reply: 'I don't know based on the provided documents.' "
+                            "Be brief (2-3 sentences), clear, and factual.\n\n"
+                            f"Context:\n{ctx}\n\nQuestion: {text}\n\nAnswer:"
+                        )
+                    else:
+                        prompt = f"Answer this question briefly and clearly in 2-3 sentences:\n\nQuestion: {text}\n\nAnswer:"
                     out = gen(
                         prompt,
-                        max_new_tokens=80,
-                        min_new_tokens=20,
+                        max_new_tokens=90,
+                        min_new_tokens=18,
                         do_sample=True,
                         temperature=0.7,
                         top_p=0.9,
@@ -82,8 +115,16 @@ def chat():
                         num_return_sequences=1
                     )
                 else:
-                    # causal LM chat-style prompt - simple and concise
-                    prompt = f"Question: {text}\nAnswer briefly in 2-3 sentences:\n\nAnswer:"
+                    # causal LM chat-style prompt - simple and concise, with context if present
+                    if context_blocks:
+                        ctx = "\n\n---\n".join(context_blocks)
+                        prompt = (
+                            "You are an enterprise assistant. Use ONLY the context below. "
+                            "If not found in context, state: 'I don't know based on the provided documents.'\n\n"
+                            f"Context:\n{ctx}\n\nQuestion: {text}\nAssistant (2-3 sentences):"
+                        )
+                    else:
+                        prompt = f"Question: {text}\nAnswer briefly in 2-3 sentences:\n\nAnswer:"
                     out = gen(
                         prompt,
                         max_new_tokens=100,
@@ -112,6 +153,9 @@ def chat():
                         reply = reply.split("Assistant:", 1)[1].strip()
                     except Exception:
                         pass
+                # If model produced the explicit unknown phrase, return only that phrase
+                if reply and "i don't know based on the provided documents" in reply.lower():
+                    reply = "I don't know based on the provided documents."
                 # Enforce a minimum reasonable length when possible, but avoid second passes for speed
         except Exception:
             app.logger.exception("Local transformers model failed")
@@ -126,6 +170,35 @@ def chat():
         return jsonify({"reply": fallback})
 
     return jsonify({"reply": reply})
+
+
+@app.route("/ingest", methods=["POST"])
+def ingest():
+    """Upload files (optional) and rebuild the RAG index from the knowledge_base folder.
+    Accepts multipart form-data with key 'files' for multiple uploads. Returns counts.
+    """
+    if not _rag_available:
+        return jsonify({"status": "error", "message": "RAG is not available on this server."}), 400
+
+    saved = []
+    try:
+        if request.files:
+            files = request.files.getlist("files")
+            saved = save_uploaded_files(files)
+    except Exception:
+        app.logger.exception("Saving uploaded files failed")
+
+    try:
+        file_count, chunk_count = rebuild_from_folder()
+        return jsonify({
+            "status": "ok",
+            "saved": [os.path.basename(p) for p in saved],
+            "files": file_count,
+            "chunks": chunk_count
+        })
+    except Exception:
+        app.logger.exception("Rebuilding RAG index failed")
+        return jsonify({"status": "error", "message": "Failed to rebuild index"}), 500
 
 if __name__ == "__main__":
     # Allow configuring host/port/debug via environment so we can bind to
