@@ -18,14 +18,18 @@ function App() {
     // Add user message
     const userMessage = { sender: "user", text: input };
     setMessages((prev) => [...prev, userMessage]);
+    
+    // Clear input immediately before loading starts
+    const messageToSend = input;
+    setInput("");
     setLoading(true);
 
-    // Send to Flask backend (keep the question in the input)
+    // Send to Flask backend
     try {
       const response = await fetch("http://127.0.0.1:5000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ message: messageToSend, use_kb: true }),
       });
 
       const data = await response.json();
@@ -39,14 +43,13 @@ function App() {
       ]);
     }
     setLoading(false);
-    setInput(""); // Clear input after sending
   };
 
   return (
     <div className="chat-shell">
       <header className="chat-header">
         <h1 className="chat-header-title">Chat with AI</h1>
-        <p className="chat-header-subtitle">Powered by AI</p>
+        <p className="chat-header-subtitle">Enterprise Knowledge Assistant</p>
       </header>
       <main className="chat-window" ref={listRef}>
         {messages.map((msg, idx) => (

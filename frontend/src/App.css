@@ -93,7 +93,6 @@ body::before {
   color: var(--text-muted);
   font-weight: 400;
   margin: 0;
-  margin-left: auto;
 }
 
 .chat-window {
