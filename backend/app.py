@@ -37,7 +37,19 @@ def get_local_generator():
     return _local_generator
 
 app = Flask(__name__)
-CORS(app)  # allows frontend (React) to talk to backend
+# Configure CORS to explicitly allow requests from Render frontend
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "https://ai-chatbot-frontend-1hme.onrender.com",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000"
+        ],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"],
+        "supports_credentials": False
+    }
+})
 
 # Attempt to load a local .env file if python-dotenv is available. This makes
 # local development easier: copy `.env.example` to `.env` and put your key there.
@@ -51,6 +63,21 @@ except Exception:
     pass
 
 app.logger.info(f"Local model: {LOCAL_MODEL_NAME} (enabled={USE_LOCAL_MODEL})")
+
+# Add CORS headers to every response
+@app.after_request
+def after_request(response):
+    origin = request.headers.get('Origin')
+    allowed_origins = [
+        'https://ai-chatbot-frontend-1hme.onrender.com',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000'
+    ]
+    if origin in allowed_origins:
+        response.headers['Access-Control-Allow-Origin'] = origin
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
 
 # --- RAG (enterprise knowledge base) ---
 try:
