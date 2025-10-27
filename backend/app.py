@@ -70,15 +70,25 @@ def after_request(response):
     return response
 
 # --- RAG (enterprise knowledge base) ---
-try:
-    from rag_store import get_store, rebuild_from_folder, save_uploaded_files
-    _rag_available = True
-    # Preload (or create empty) index on startup
-    _ = get_store()
-    app.logger.info("RAG index ready (loaded or initialized)")
-except Exception as e:  # pragma: no cover
-    _rag_available = False
-    app.logger.warning(f"RAG disabled: {e}")
+# Make RAG loading lazy to save memory - only load when actually needed
+_rag_available = False
+_rag_store = None
+
+def get_rag_store():
+    """Lazily load RAG store only when needed to save memory."""
+    global _rag_available, _rag_store
+    if _rag_store is not None:
+        return _rag_store
+    try:
+        from rag_store import get_store
+        _rag_store = get_store()
+        _rag_available = True
+        app.logger.info("RAG index loaded on demand")
+        return _rag_store
+    except Exception as e:
+        app.logger.warning(f"RAG disabled: {e}")
+        _rag_available = False
+        return None
 
 
 @app.route("/", methods=["GET"])
@@ -98,12 +108,13 @@ def chat():
 
     # Retrieve enterprise context when available
     context_blocks: List[str] = []
-    if _rag_available and use_kb:
+    if use_kb:
         try:
-            store = get_store()
-            chunks = store.retrieve(user_message, top_k=5)
-            for ch in chunks:
-                context_blocks.append(f"[Source: {ch.source}]\n{ch.text}")
+            store = get_rag_store()
+            if store:
+                chunks = store.retrieve(user_message, top_k=5)
+                for ch in chunks:
+                    context_blocks.append(f"[Source: {ch.source}]\n{ch.text}")
         except Exception:
             app.logger.exception("RAG retrieval failed")
     # Local-only generation
@@ -269,12 +280,14 @@ def ingest():
     saved = []
     try:
         if request.files:
+            from rag_store import save_uploaded_files
             files = request.files.getlist("files")
             saved = save_uploaded_files(files)
     except Exception:
         app.logger.exception("Saving uploaded files failed")
 
     try:
+        from rag_store import rebuild_from_folder
         file_count, chunk_count = rebuild_from_folder()
         return jsonify({
             "status": "ok",
