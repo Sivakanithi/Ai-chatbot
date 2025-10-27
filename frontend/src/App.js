@@ -12,10 +12,20 @@ function App() {
 
   useEffect(() => {
     // Fetch document information on mount
+    console.log("🔧 API_BASE_URL:", API_BASE_URL);
     fetch(`${API_BASE_URL}/documents`)
-      .then((res) => res.json())
-      .then((data) => setDocumentInfo(data))
-      .catch((err) => console.error("Failed to fetch documents:", err));
+      .then((res) => {
+        console.log("📡 Documents response status:", res.status);
+        return res.json();
+      })
+      .then((data) => {
+        console.log("✅ Documents data:", data);
+        setDocumentInfo(data);
+      })
+      .catch((err) => {
+        console.error("❌ Failed to fetch documents:", err);
+        console.error("❌ Error details:", err.message);
+      });
   }, []);
 
   useEffect(() => {
@@ -38,17 +48,23 @@ function App() {
 
     // Send to Flask backend
     try {
+      console.log("📤 Sending message to:", `${API_BASE_URL}/chat`);
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: textToSend, use_kb: true }),
       });
 
+      console.log("📡 Chat response status:", response.status);
       const data = await response.json();
+      console.log("✅ Chat data:", data);
       const botMessage = { sender: "bot", text: data.reply };
 
       setMessages((prev) => [...prev, botMessage]);
     } catch (error) {
+      console.error("❌ Chat error:", error);
+      console.error("❌ Error message:", error.message);
+      console.error("❌ Error stack:", error.stack);
       setMessages((prev) => [
         ...prev,
         { sender: "bot", text: "Error: Could not connect to server." },
