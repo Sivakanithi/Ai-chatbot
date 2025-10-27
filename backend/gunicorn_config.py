@@ -1,8 +1,10 @@
 bind = "0.0.0.0:10000"
-workers = 1  # Use 1 worker for free tier to save memory
-threads = 2
-timeout = 120  # Longer timeout for AI model inference
+workers = 1  # Single worker for free tier to save memory
+threads = 1  # Reduced from 2 to save memory
+timeout = 180  # Longer timeout for AI model inference and downloads
 worker_class = "sync"
-max_requests = 1000
-max_requests_jitter = 50
-preload_app = True  # Preload the app to save memory
+max_requests = 100  # Restart worker after 100 requests to free memory
+max_requests_jitter = 10
+preload_app = False  # Changed to False to reduce startup memory
+worker_tmp_dir = "/dev/shm"  # Use RAM disk for worker heartbeat (if available)
+graceful_timeout = 30
