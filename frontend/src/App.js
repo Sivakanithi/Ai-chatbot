@@ -1,7 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 
-// API Configuration - Change this for production
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:5000";
+// API Configuration - Detect production vs development
+const API_BASE_URL = 
+  process.env.REACT_APP_API_URL || 
+  (window.location.hostname.includes('onrender.com') 
+    ? 'https://ai-chatbot-v9re.onrender.com' 
+    : 'http://127.0.0.1:5000');
 
 function App() {
   const [messages, setMessages] = useState([]);
