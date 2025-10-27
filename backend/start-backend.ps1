@@ -12,7 +12,7 @@ $pythonCandidates = @(
 $port = $env:PORT -as [int]
 if (-not $port) { $port = 5000 }
 # Use a different variable name to avoid clobbering PowerShell's built-in $Host
-$bindHost = $env:HOST
+$bindHost = $env:FLASK_HOST
 if (-not $bindHost) { $bindHost = "0.0.0.0" }
 
 # Find a usable python
@@ -40,9 +40,7 @@ $stderr = Join-Path $backendDir "backend.err.log"
 Write-Output ("Starting backend in {0} on {1}:{2} (logs: {3}, {4})" -f $backendDir, $bindHost, $port, $stdout, $stderr)
 # Pass host/port (and optional local-model flags) through environment when launching so the app binds correctly
 # Set the environment variables in this process so child process inherits them (compatible with PowerShell 5.1)
-$oldHostVal = $env:HOST
-$oldPortVal = $env:PORT
-$env:HOST = $bindHost
+$env:FLASK_HOST = $bindHost
 $env:PORT = "$port"
 if ($env:USE_LOCAL_MODEL) { $env:USE_LOCAL_MODEL = $env:USE_LOCAL_MODEL }
 if ($env:LOCAL_MODEL_NAME) { $env:LOCAL_MODEL_NAME = $env:LOCAL_MODEL_NAME }

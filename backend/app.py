@@ -172,6 +172,66 @@ def chat():
     return jsonify({"reply": reply})
 
 
+@app.route("/documents", methods=["GET"])
+def get_documents():
+    """Get information about documents in the knowledge base."""
+    if not _rag_available:
+        return jsonify({"documents": [], "topics": []})
+    
+    try:
+        from rag_store import KB_DIR
+        documents = []
+        topics = []
+        
+        # Scan knowledge_base folder for documents
+        for root, _, files in os.walk(KB_DIR):
+            for file in files:
+                if file.endswith(('.txt', '.md', '.pdf', '.docx')):
+                    filepath = os.path.join(root, file)
+                    # Extract topic name from filename (remove extension and format nicely)
+                    topic = os.path.splitext(file)[0].replace('_', ' ').replace('-', ' ').title()
+                    documents.append({
+                        "filename": file,
+                        "topic": topic
+                    })
+                    topics.append(topic)
+        
+        # Generate sample questions based on first document
+        sample_questions = []
+        if documents:
+            topic = documents[0]["topic"]
+            filename = documents[0]["filename"].lower()
+            
+            # Generate context-aware questions
+            if "chatgpt" in filename or "chat" in filename:
+                sample_questions = [
+                    "What is ChatGPT?",
+                    "How can I use ChatGPT effectively?",
+                    "What are the key features of ChatGPT?"
+                ]
+            elif "company" in filename or "overview" in filename:
+                sample_questions = [
+                    f"What is {topic}?",
+                    f"Tell me about {topic}",
+                    f"What services does the company provide?"
+                ]
+            else:
+                sample_questions = [
+                    f"What is {topic}?",
+                    f"Tell me about {topic}",
+                    f"How does {topic} work?"
+                ]
+        
+        return jsonify({
+            "documents": documents,
+            "topics": topics,
+            "sample_questions": sample_questions
+        })
+    except Exception as e:
+        app.logger.exception("Failed to get documents")
+        return jsonify({"documents": [], "topics": [], "sample_questions": []})
+
+
 @app.route("/ingest", methods=["POST"])
 def ingest():
     """Upload files (optional) and rebuild the RAG index from the knowledge_base folder.

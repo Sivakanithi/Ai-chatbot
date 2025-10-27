@@ -1,10 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
 
+// API Configuration - Change this for production
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:5000";
+
 function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [documentInfo, setDocumentInfo] = useState(null);
   const listRef = useRef(null);
+
+  useEffect(() => {
+    // Fetch document information on mount
+    fetch(`${API_BASE_URL}/documents`)
+      .then((res) => res.json())
+      .then((data) => setDocumentInfo(data))
+      .catch((err) => console.error("Failed to fetch documents:", err));
+  }, []);
 
   useEffect(() => {
     if (listRef.current) {
@@ -12,24 +24,24 @@ function App() {
     }
   }, [messages, loading]);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  const sendMessage = async (messageText) => {
+    const textToSend = messageText || input;
+    if (!textToSend.trim()) return;
 
     // Add user message
-    const userMessage = { sender: "user", text: input };
+    const userMessage = { sender: "user", text: textToSend };
     setMessages((prev) => [...prev, userMessage]);
     
     // Clear input immediately before loading starts
-    const messageToSend = input;
     setInput("");
     setLoading(true);
 
     // Send to Flask backend
     try {
-      const response = await fetch("http://127.0.0.1:5000/chat", {
+      const response = await fetch(`${API_BASE_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: messageToSend, use_kb: true }),
+        body: JSON.stringify({ message: textToSend, use_kb: true }),
       });
 
       const data = await response.json();
@@ -52,6 +64,36 @@ function App() {
         <p className="chat-header-subtitle">Enterprise Knowledge Assistant</p>
       </header>
       <main className="chat-window" ref={listRef}>
+        {messages.length === 0 && !loading && documentInfo && documentInfo.topics.length > 0 && (
+          <div className="entry-ui">
+            <div className="entry-welcome">
+              <div className="entry-icon">📚</div>
+              <h2 className="entry-title">
+                {documentInfo.topics.length === 1 
+                  ? `Want to know about ${documentInfo.topics[0]}?`
+                  : `Want to know about ${documentInfo.topics.slice(0, -1).join(", ")} and ${documentInfo.topics.slice(-1)}?`
+                }
+              </h2>
+              <p className="entry-subtitle">I can help you with information from our knowledge base</p>
+            </div>
+            {documentInfo.sample_questions && documentInfo.sample_questions.length > 0 && (
+              <div className="sample-questions">
+                <p className="sample-label">Try asking:</p>
+                <div className="question-chips">
+                  {documentInfo.sample_questions.map((question, idx) => (
+                    <button
+                      key={idx}
+                      className="question-chip"
+                      onClick={() => sendMessage(question)}
+                    >
+                      {question}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {messages.map((msg, idx) => (
           <div key={idx} className={`row ${msg.sender === "user" ? "right" : "left"}`}>
             <div className={`bubble ${msg.sender}`}>
@@ -85,7 +127,7 @@ function App() {
             }
           }}
         />
-        <button onClick={sendMessage} disabled={loading || !input.trim()} className="send-btn">
+        <button onClick={() => sendMessage()} disabled={loading || !input.trim()} className="send-btn">
           {loading ? (
             <>
               <span className="spinner"></span> Thinking...

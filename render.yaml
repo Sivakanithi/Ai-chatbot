@@ -1,0 +1,39 @@
+services:
+  # Backend Flask API
+  - type: web
+    name: ai-chatbot-backend
+    runtime: python
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -c gunicorn_config.py app:app
+    envVars:
+      - key: USE_LOCAL_MODEL
+        value: "1"
+      - key: LOCAL_MODEL_NAME
+        value: google/flan-t5-small
+      - key: FLASK_HOST
+        value: 0.0.0.0
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    healthCheckPath: /
+
+  # Frontend React Static Site
+  - type: web
+    name: ai-chatbot-frontend
+    runtime: static
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./build
+    envVars:
+      - key: NODE_VERSION
+        value: "18"
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
