@@ -92,7 +92,6 @@ def chat():
         response = jsonify({"status": "ok"})
         return response
     
-def chat():
     data = request.get_json()
     user_message = data.get("message", "")
     use_kb = bool(data.get("use_kb", True))
