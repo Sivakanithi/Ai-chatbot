@@ -1,54 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
 
-// API base URL strategy (works across devices without rebuild):
-// - Start with REACT_APP_API_URL (from build env) or localhost default
-// - Then, if /config.json is present in public, override at runtime
-// - If apiBase is empty string, use same-origin relative paths
-const localhostDefault =
-  window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-    ? "http://127.0.0.1:5000"
-    : "";
-
 function App() {
-  const [apiBase, setApiBase] = useState(
-    () => process.env.REACT_APP_API_URL || localhostDefault
-  );
-  const apiUrl = (path) => (apiBase ? `${apiBase}${path}` : path);
-
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [documentInfo, setDocumentInfo] = useState(null);
-  const [backendError, setBackendError] = useState(null);
   const listRef = useRef(null);
 
-    // Optional runtime config override (public/config.json)
     useEffect(() => {
-      fetch("/config.json", { cache: "no-store" })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((cfg) => {
-          if (cfg && typeof cfg.apiBase === "string" && cfg.apiBase !== apiBase) {
-            setApiBase(cfg.apiBase);
-          }
-        })
-        .catch(() => {});
+      fetch("http://127.0.0.1:5000/documents")
+        .then((res) => res.json())
+        .then((data) => setDocumentInfo(data));
     }, []);
-
-    useEffect(() => {
-      fetch(apiUrl("/documents"))
-        .then((res) => {
-          if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-          return res.json();
-        })
-        .then((data) => {
-          setDocumentInfo(data);
-          setBackendError(null);
-        })
-        .catch((err) => {
-          console.error("Failed to fetch documents:", err);
-          setBackendError(`Backend not reachable at ${apiBase || "same-origin"}.`);
-        });
-    }, [apiBase]);
 
     useEffect(() => {
       if (listRef.current) {
@@ -63,16 +26,15 @@ function App() {
       setInput("");
       setLoading(true);
       try {
-        const response = await fetch(apiUrl("/chat"), {
+        const response = await fetch("http://127.0.0.1:5000/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: textToSend, use_kb: true }),
         });
         const data = await response.json();
         setMessages((prev) => [...prev, { sender: "bot", text: data.reply }]);
-      } catch (e) {
+      } catch {
         setMessages((prev) => [...prev, { sender: "bot", text: "Error: Could not connect to server." }]);
-        console.error("Chat request failed:", e);
       }
       setLoading(false);
     };
@@ -84,16 +46,7 @@ function App() {
           <p className="chat-header-subtitle">Enterprise Knowledge Assistant</p>
         </header>
         <main className="chat-window" ref={listRef}>
-          {backendError && messages.length === 0 && (
-            <div className="entry-ui">
-              <div className="entry-welcome">
-                <p className="entry-subtitle" style={{ color: "#fca5a5" }}>
-                  {backendError} Set REACT_APP_API_URL or add public/config.json with {{"apiBase":"https://your-backend"}} and deploy.
-                </p>
-              </div>
-            </div>
-          )}
-          {messages.length === 0 && !loading && documentInfo && documentInfo.topics && documentInfo.topics.length > 0 && (
+          {messages.length === 0 && !loading && documentInfo && documentInfo.topics.length > 0 && (
             <div className="entry-ui">
               <div className="entry-welcome">
                 <div className="company-logo-container">
