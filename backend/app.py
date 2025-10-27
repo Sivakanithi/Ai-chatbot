@@ -37,14 +37,10 @@ def get_local_generator():
     return _local_generator
 
 app = Flask(__name__)
-# Configure CORS to explicitly allow requests from Render frontend
+# Configure CORS to allow all origins (suitable for demo/development)
 CORS(app, resources={
     r"/*": {
-        "origins": [
-            "https://ai-chatbot-frontend-1hme.onrender.com",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000"
-        ],
+        "origins": "*",  # Allow all origins
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type"],
         "supports_credentials": False
@@ -67,14 +63,8 @@ app.logger.info(f"Local model: {LOCAL_MODEL_NAME} (enabled={USE_LOCAL_MODEL})")
 # Add CORS headers to every response
 @app.after_request
 def after_request(response):
-    origin = request.headers.get('Origin')
-    allowed_origins = [
-        'https://ai-chatbot-frontend-1hme.onrender.com',
-        'http://localhost:3000',
-        'http://127.0.0.1:3000'
-    ]
-    if origin in allowed_origins:
-        response.headers['Access-Control-Allow-Origin'] = origin
+    # Allow all origins for simplicity
+    response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
     return response
