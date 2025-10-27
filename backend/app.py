@@ -95,7 +95,13 @@ except Exception as e:  # pragma: no cover
 def home():
     return "Welcome to the AI Chatbot backend! Use the /chat endpoint for POST requests."
 
-@app.route("/chat", methods=["POST"])
+@app.route("/chat", methods=["POST", "OPTIONS"])
+def chat():
+    # Handle preflight OPTIONS request
+    if request.method == "OPTIONS":
+        response = jsonify({"status": "ok"})
+        return response
+    
 def chat():
     data = request.get_json()
     user_message = data.get("message", "")
@@ -199,9 +205,13 @@ def chat():
     return jsonify({"reply": reply})
 
 
-@app.route("/documents", methods=["GET"])
+@app.route("/documents", methods=["GET", "OPTIONS"])
 def get_documents():
     """Get information about documents in the knowledge base."""
+    # Handle preflight OPTIONS request
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"})
+    
     if not _rag_available:
         return jsonify({"documents": [], "topics": []})
     
