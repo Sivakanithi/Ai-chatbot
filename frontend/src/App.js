@@ -1,12 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 
-// API Configuration - Detect production vs development
-const API_BASE_URL = 
-  process.env.REACT_APP_API_URL || 
-  (window.location.hostname.includes('onrender.com') 
-    ? 'https://ai-chatbot-v9re.onrender.com' 
-    : 'http://127.0.0.1:5000');
-
 function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -16,20 +9,10 @@ function App() {
 
   useEffect(() => {
     // Fetch document information on mount
-    console.log("🔧 API_BASE_URL:", API_BASE_URL);
-    fetch(`${API_BASE_URL}/documents`)
-      .then((res) => {
-        console.log("📡 Documents response status:", res.status);
-        return res.json();
-      })
-      .then((data) => {
-        console.log("✅ Documents data:", data);
-        setDocumentInfo(data);
-      })
-      .catch((err) => {
-        console.error("❌ Failed to fetch documents:", err);
-        console.error("❌ Error details:", err.message);
-      });
+    fetch("http://127.0.0.1:5000/documents")
+      .then((res) => res.json())
+      .then((data) => setDocumentInfo(data))
+      .catch((err) => console.error("Failed to fetch documents:", err));
   }, []);
 
   useEffect(() => {
@@ -52,23 +35,17 @@ function App() {
 
     // Send to Flask backend
     try {
-      console.log("📤 Sending message to:", `${API_BASE_URL}/chat`);
-      const response = await fetch(`${API_BASE_URL}/chat`, {
+      const response = await fetch("http://127.0.0.1:5000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: textToSend, use_kb: true }),
       });
 
-      console.log("📡 Chat response status:", response.status);
       const data = await response.json();
-      console.log("✅ Chat data:", data);
       const botMessage = { sender: "bot", text: data.reply };
 
       setMessages((prev) => [...prev, botMessage]);
     } catch (error) {
-      console.error("❌ Chat error:", error);
-      console.error("❌ Error message:", error.message);
-      console.error("❌ Error stack:", error.stack);
       setMessages((prev) => [
         ...prev,
         { sender: "bot", text: "Error: Could not connect to server." },
@@ -87,26 +64,21 @@ function App() {
         {messages.length === 0 && !loading && documentInfo && documentInfo.topics.length > 0 && (
           <div className="entry-ui">
             <div className="entry-welcome">
-              <div className="entry-icon">📚</div>
+              <div className="company-logo-container">
+                <img src="/company-logo.png" alt="House of Companies" className="company-logo" />
+              </div>
               <h2 className="entry-title">
-                {documentInfo.topics.length === 1 
-                  ? `Want to know about ${documentInfo.topics[0]}?`
-                  : `Want to know about ${documentInfo.topics.slice(0, -1).join(", ")} and ${documentInfo.topics.slice(-1)}?`
-                }
+                Your Global Business Setup Partner
               </h2>
-              <p className="entry-subtitle">I can help you with information from our knowledge base</p>
+              <p className="entry-subtitle">Ask me anything about our services, pricing, or how we can help your business expand</p>
             </div>
             {documentInfo.sample_questions && documentInfo.sample_questions.length > 0 && (
               <div className="sample-questions">
-                <p className="sample-label">Try asking:</p>
+                <p className="sample-label">Popular Questions:</p>
                 <div className="question-chips">
-                  {documentInfo.sample_questions.map((question, idx) => (
-                    <button
-                      key={idx}
-                      className="question-chip"
-                      onClick={() => sendMessage(question)}
-                    >
-                      {question}
+                  {documentInfo.sample_questions.slice(0, 3).map((q, i) => (
+                    <button key={i} className="question-chip" onClick={() => sendMessage(q)}>
+                      💡 {q}
                     </button>
                   ))}
                 </div>
@@ -147,7 +119,7 @@ function App() {
             }
           }}
         />
-        <button onClick={() => sendMessage()} disabled={loading || !input.trim()} className="send-btn">
+        <button onClick={sendMessage} disabled={loading || !input.trim()} className="send-btn">
           {loading ? (
             <>
               <span className="spinner"></span> Thinking...
