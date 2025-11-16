@@ -1,0 +1,56 @@
+# Environment variables - NEVER COMMIT THESE
+.env
+backend/.env
+**/.env
+
+# Virtual environments
+.venv/
+.venv-1/
+venv/
+backend/venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# RAG data - contains embeddings and uploaded documents
+backend/data/
+backend/knowledge_base/
+
+# Logs
+*.log
+backend/*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Build outputs
+frontend/build/
+frontend/dist/
+*.egg-info/
+dist/
+build/
+
+# Model cache (HuggingFace downloads)
+.cache/
+models/
+
+# Temporary files
+*.tmp
+*.bak

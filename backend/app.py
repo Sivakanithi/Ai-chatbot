@@ -2,6 +2,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
+from typing import List
 
 # Local model support (transformers only)
 # Default to a very fast, instruction-tuned seq2seq model for quick paragraph answers
@@ -116,6 +117,22 @@ def get_documents():
         app.logger.exception("Failed to get documents")
         return jsonify({"documents": [], "topics": [], "sample_questions": []}), 500
 
+
+@app.route("/rebuild-index", methods=["POST", "GET"])
+def rebuild_index():
+    """Rebuild the vector index from the current knowledge_base folder.
+    Use this after adding/removing/updating files to guarantee retrieval uses latest data.
+    """
+    if not _rag_available:
+        return jsonify({"status": "rag_disabled", "files": 0, "chunks": 0}), 503
+    try:
+        from rag_store import rebuild_from_folder
+        files, chunks = rebuild_from_folder()
+        return jsonify({"status": "ok", "files": files, "chunks": chunks})
+    except Exception:
+        app.logger.exception("Failed to rebuild index")
+        return jsonify({"status": "error"}), 500
+
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
@@ -132,6 +149,12 @@ def chat():
                 context_blocks.append(f"[Source: {ch.source}]\n{ch.text}")
         except Exception:
             app.logger.exception("RAG retrieval failed")
+
+    # Enforce KB-only answers when requested
+    if use_kb and _rag_available and len(context_blocks) == 0:
+        return jsonify({
+            "reply": "I don't know based on the provided documents. Please add this information to the knowledge base."
+        })
     
     # Local-only generation
     reply = None
@@ -152,13 +175,13 @@ def chat():
                         )
                     else:
                         prompt = f"Answer this question briefly and clearly in 2-3 sentences:\n\nQuestion: {text}\n\nAnswer:"
+                    # Make generation deterministic to reduce hallucinations
                     out = gen(
                         prompt,
-                        max_new_tokens=80,
-                        min_new_tokens=20,
-                        do_sample=True,
-                        temperature=0.7,
-                        top_p=0.9,
+                        max_new_tokens=120,
+                        min_new_tokens=30,
+                        do_sample=False,
+                        num_beams=4,
                         repetition_penalty=2.0,
                         no_repeat_ngram_size=3,
                         num_return_sequences=1
@@ -177,9 +200,7 @@ def chat():
                     out = gen(
                         prompt,
                         max_new_tokens=100,
-                        do_sample=True,
-                        temperature=0.7,
-                        top_p=0.9,
+                        do_sample=False,
                         repetition_penalty=2.0,
                         no_repeat_ngram_size=3,
                         num_return_sequences=1
